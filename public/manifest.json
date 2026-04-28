@@ -1,0 +1,9 @@
+{
+    "name" : "Rally Paper 2026",
+    "short_name": "Rally",
+    "description" : "Sistema de Pontos",
+    "start_url": "/index.html",
+    "display": "standalone",
+    "background_color" : "#1a73e8",
+    "theme_color": "#1a73e8"
+}
