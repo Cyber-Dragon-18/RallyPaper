@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0d0f14">
+  <title>Rally Paper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:    #0d0f14;
+      --surf:  #161920;
+      --surf2: #1d2130;
+      --bdr:   #252a3a;
+      --gold:  #f0cd55;
+      --gold2: #c49d20;
+      --red:   #ff4d3a;
+      --green: #30d888;
+      --text:  #eef0f8;
+      --muted: #5a607a;
+      --r:     16px;
+      --nav:   68px;
+      --safe:  env(safe-area-inset-bottom, 0px);
+      --top:   env(safe-area-inset-top, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); overscroll-behavior: none; }
+
+    /* TOP BAR */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      background: var(--bg); border-bottom: 1px solid var(--bdr);
+      padding: calc(14px + var(--top)) 20px 14px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 3px; color: var(--gold); line-height: 1; }
+    .logo em { color: var(--text); font-style: normal; }
+    .live { display: flex; align-items: center; gap: 7px; }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: blink 2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.5)} }
+    .live-lbl { font-size: 11px; font-weight: 800; color: var(--green); letter-spacing: 1.5px; text-transform: uppercase; }
+
+    /* SCROLL AREA */
+    .scroll-area {
+      position: fixed;
+      top: calc(53px + var(--top));
+      left: 0; right: 0;
+      bottom: calc(var(--nav) + var(--safe));
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
+    .view { display: none; padding: 16px; max-width: 600px; margin: 0 auto; }
+    .view.active { display: block; }
+
+    /* BOTTOM NAV */
+    .bnav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+      background: var(--surf); border-top: 1px solid var(--bdr);
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      height: calc(var(--nav) + var(--safe));
+      padding-bottom: var(--safe);
+    }
+    .nbtn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      border: none; background: transparent; color: var(--muted);
+      font-family: 'DM Sans', sans-serif; font-size: 10px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: .8px; cursor: pointer; padding: 8px 0;
+    }
+    .nbtn svg { width: 24px; height: 24px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke .2s; }
+    .nbtn.active { color: var(--gold); }
+    .nbtn.active svg { stroke: var(--gold); }
+
+    /* TYPOGRAPHY */
+    .sec { font-family: 'Bebas Neue', sans-serif; font-size: 12px; letter-spacing: 2.5px; color: var(--muted); text-transform: uppercase; margin: 20px 0 10px; }
+    .sec:first-child { margin-top: 4px; }
+
+    /* STAGE PILLS */
+    .stage-scroll { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; margin-bottom: 18px; }
+    .stage-scroll::-webkit-scrollbar { display: none; }
+    .spill {
+      flex-shrink: 0; min-width: 78px;
+      background: var(--surf); border: 2px solid var(--bdr); border-radius: 14px;
+      padding: 12px 10px; text-align: center; cursor: pointer; transition: all .18s;
+    }
+    .spill .sn { font-family: 'Bebas Neue', sans-serif; font-size: 38px; line-height: 1; color: var(--text); }
+    .spill .sl { font-size: 10px; font-weight: 700; color: var(--muted); margin-top: 3px; max-width: 68px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .spill.sel { border-color: var(--gold); background: rgba(240,205,85,.07); }
+    .spill.sel .sn { color: var(--gold); }
+    .spill.sel .sl { color: var(--gold2); }
+
+    /* CLUE BANNER */
+    .clue {
+      background: linear-gradient(135deg,#16110000,#1e1a0500);
+      background-color: #14110a;
+      border: 1px solid rgba(240,205,85,.2); border-radius: var(--r);
+      padding: 16px; margin-bottom: 18px; display: none; position: relative; overflow: hidden;
+    }
+    .clue::after { content:'🗺'; position:absolute; right:-6px; top:-6px; font-size:60px; opacity:.06; }
+    .clue.show { display: block; }
+    .clue-tag { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: var(--gold2); margin-bottom: 9px; }
+    .clue-body { font-size: 15px; line-height: 1.65; color: var(--text); font-weight: 500; }
+    .clue-chips { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .chip { background: rgba(240,205,85,.1); border-radius: 20px; padding: 4px 11px; font-size: 11px; font-weight: 700; color: var(--gold); }
+
+    /* TEAM CARDS */
+    .tcard { background: var(--surf); border: 1px solid var(--bdr); border-radius: var(--r); margin-bottom: 10px; overflow: hidden; }
+    .tcard-top { display: flex; align-items: center; padding: 14px 16px; gap: 12px; }
+    .tstripe { width: 4px; height: 42px; border-radius: 3px; flex-shrink: 0; }
+    .tinfo { flex: 1; min-width: 0; }
+    .tinfo .tn { font-size: 16px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tinfo .tt { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .tbadge { font-family: 'Bebas Neue', sans-serif; font-size: 30px; color: var(--gold); min-width: 50px; text-align: right; line-height: 1; }
+
+    /* SCORE CONTROLS */
+    .sctrl { display: grid; grid-template-columns: 60px 1fr 60px 60px; border-top: 1px solid var(--bdr); }
+    .sbtn {
+      height: 58px; border: none; background: var(--surf2); color: var(--text);
+      font-size: 24px; font-weight: 800; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'DM Sans', sans-serif; transition: background .1s;
+    }
+    .sbtn:active { background: var(--bdr); }
+    .sbtn.minus { border-right: 1px solid var(--bdr); }
+    .sbtn.plus  { border-right: 1px solid var(--bdr); }
+    .sbtn.save  { background: var(--gold); color: #000; font-size: 18px; }
+    .sbtn.save:active { background: var(--gold2); }
+    .sbtn.save.ok { background: var(--green); color: #000; }
+    .snwrap { display: flex; align-items: center; justify-content: center; border-right: 1px solid var(--bdr); }
+    .snum {
+      width: 100%; text-align: center; background: transparent; border: none;
+      color: var(--text); font-size: 22px; font-weight: 800;
+      font-family: 'DM Sans', sans-serif; padding: 0;
+    }
+    .snum:focus { outline: none; color: var(--gold); }
+
+    /* LEADERBOARD */
+    .podium { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 8px; margin-bottom: 18px; align-items: flex-end; }
+    .pcard { background: var(--surf); border: 1px solid var(--bdr); border-radius: var(--r); text-align: center; padding: 16px 8px 14px; }
+    .pcard.p1 { border-color: var(--gold); background: rgba(240,205,85,.06); transform: translateY(-8px); }
+    .pcard.p2 { border-color: #8aa; }
+    .pcard.p3 { border-color: #b07030; }
+    .pmedal { font-size: 26px; margin-bottom: 6px; }
+    .prank { font-family: 'Bebas Neue', sans-serif; font-size: 40px; color: var(--gold); line-height: 1; }
+    .pdot { width: 10px; height: 10px; border-radius: 50%; margin: 6px auto 4px; }
+    .pname { font-size: 12px; font-weight: 700; word-break: break-word; line-height: 1.3; }
+    .ppts { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--gold); margin-top: 4px; }
+
+    .rlist { background: var(--surf); border: 1px solid var(--bdr); border-radius: var(--r); overflow: hidden; }
+    .ritem { display: flex; align-items: center; padding: 14px 16px; gap: 12px; border-bottom: 1px solid var(--bdr); }
+    .ritem:last-child { border-bottom: none; }
+    .rpos { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--muted); min-width: 28px; text-align: center; }
+    .rpos.top { color: var(--gold); }
+    .rclr { width: 4px; border-radius: 2px; align-self: stretch; flex-shrink: 0; }
+    .rinfo { flex: 1; min-width: 0; }
+    .rinfo .rn { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rstops { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+    .rstop { background: var(--surf2); border-radius: 6px; padding: 2px 6px; font-size: 10px; font-weight: 600; color: var(--muted); }
+    .rstop.has { color: var(--text); }
+    .rtotal { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: var(--gold); min-width: 52px; text-align: right; }
+
+    /* ADMIN FORMS */
+    .fgroup { display: flex; flex-direction: column; gap: 12px; background: var(--surf); border: 1px solid var(--bdr); border-radius: var(--r); padding: 16px; margin-bottom: 10px; }
+    .flabel { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin-bottom: 5px; display: block; }
+    .finput {
+      background: var(--surf2); border: 1.5px solid var(--bdr); border-radius: 12px;
+      color: var(--text); font-size: 15px; font-weight: 500; padding: 13px 14px;
+      font-family: 'DM Sans', sans-serif; width: 100%; transition: border-color .18s;
+    }
+    .finput:focus { outline: none; border-color: var(--gold); }
+    .finput[type="color"] { height: 50px; padding: 5px 10px; cursor: pointer; }
+    textarea.finput { resize: vertical; min-height: 88px; }
+    select.finput { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235a607a' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .bgold { background: var(--gold); color: #000; border: none; border-radius: 12px; padding: 15px; font-size: 15px; font-weight: 800; font-family: 'DM Sans', sans-serif; cursor: pointer; width: 100%; }
+    .bgold:active { opacity: .8; }
+    .bghost { background: transparent; border: 1.5px solid var(--bdr); color: var(--muted); border-radius: 12px; padding: 13px; font-size: 14px; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; width: 100%; }
+    .bghost:active { border-color: var(--red); color: var(--red); }
+
+    .aitem { background: var(--surf); border: 1px solid var(--bdr); border-radius: var(--r); margin-bottom: 8px; overflow: hidden; }
+    .arow { display: flex; align-items: center; padding: 14px 16px; gap: 12px; }
+    .ainfo { flex: 1; min-width: 0; }
+    .ainfo strong { display: block; font-size: 15px; font-weight: 700; }
+    .ainfo span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .abtns { display: flex; gap: 8px; flex-shrink: 0; }
+    .bsm { border: none; border-radius: 10px; padding: 9px 14px; font-size: 12px; font-weight: 700; font-family: 'DM Sans', sans-serif; cursor: pointer; }
+    .bsm.edit { background: rgba(240,205,85,.12); color: var(--gold); }
+    .bsm.del  { background: rgba(255,77,58,.1); color: var(--red); }
+
+    .eform { border-top: 1px solid var(--bdr); padding: 16px; display: none; flex-direction: column; gap: 12px; }
+    .eform.open { display: flex; }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: calc(var(--nav) + var(--safe) + 14px); left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: var(--surf2); border: 1px solid var(--bdr);
+      color: var(--text); font-weight: 700; font-size: 13px;
+      padding: 11px 22px; border-radius: 50px; z-index: 999;
+      opacity: 0; transition: all .25s ease; white-space: nowrap; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* EMPTY */
+    .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 14px; font-weight: 500; }
+    .ei { font-size: 36px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo">Rally<em>Paper</em></div>
+  <div class="live"><div class="live-dot"></div><span class="live-lbl">Live</span></div>
+</header>
+
+<div class="scroll-area">
+
+  <!-- SCORE -->
+  <div id="view-score" class="view active">
+    <p class="sec">Etapa</p>
+    <div class="stage-scroll" id="stageBtns"></div>
+
+    <div class="clue" id="clueCard">
+      <div class="clue-tag">🗺 Pista — próxima paragem</div>
+      <div class="clue-body" id="clueText"></div>
+      <div class="clue-chips">
+        <span class="chip" id="clueLocation"></span>
+        <span class="chip" id="clueMax"></span>
+      </div>
+    </div>
+
+    <p class="sec" id="scoreTitle" style="display:none">Equipas</p>
+    <div id="teamsList"></div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div id="view-board" class="view">
+    <p class="sec">Pódio</p>
+    <div class="podium" id="podium"></div>
+    <p class="sec">Classificação</p>
+    <div class="rlist" id="rankBody"></div>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="view-admin" class="view">
+    <p class="sec">Adicionar Equipa</p>
+    <div class="fgroup">
+      <div><span class="flabel">Nome</span><input class="finput" type="text" id="newTeamName" placeholder="Ex: Equipa Trovão"></div>
+      <div><span class="flabel">Cor</span><input class="finput" type="color" id="newTeamColor" value="#f0cd55"></div>
+      <button class="bgold" onclick="createTeam()">+ Adicionar Equipa</button>
+    </div>
+    <p class="sec">Equipas</p>
+    <div id="teamAdminList"></div>
+
+    <p class="sec">Nova Etapa</p>
+    <div class="fgroup">
+      <div class="row2">
+        <div><span class="flabel">Paragem Nº</span>
+          <select class="finput" id="newStageStop">
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+            <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+          </select>
+        </div>
+        <div><span class="flabel">Máx. Pontos</span><input class="finput" type="number" id="newStageMax" value="100"></div>
+      </div>
+      <div><span class="flabel">Nome do Desafio</span><input class="finput" type="text" id="newStageName" placeholder="Ex: Corrida de Sacos"></div>
+      <div><span class="flabel">Local</span><input class="finput" type="text" id="newStageLocation" placeholder="Ex: Praça da Liberdade"></div>
+      <div><span class="flabel">Pista para a próxima paragem</span><textarea class="finput" id="newStageClue" placeholder="Escreve aqui..."></textarea></div>
+      <button class="bgold" onclick="createStage()">+ Guardar Etapa</button>
+    </div>
+    <p class="sec">Etapas</p>
+    <div id="stageAdminList"></div>
+    <div style="height:24px"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<nav class="bnav">
+  <button class="nbtn active" id="nav-score" onclick="showView('score',this)">
+    <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    Pontuar
+  </button>
+  <button class="nbtn" id="nav-board" onclick="showView('board',this)">
+    <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20V14"/></svg>
+    Tabela
+  </button>
+  <button class="nbtn" id="nav-admin" onclick="showView('admin',this)">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.58-7 8-7s8 3 8 7"/></svg>
+    Admin
+  </button>
+</nav>
+
+<script>
+  let teams=[], stages=[], selectedStop=null, activeView='score';
+
+  function showView(name, btn) {
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.querySelectorAll('.nbtn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('view-'+name).classList.add('active');
+    btn.classList.add('active');
+    activeView = name;
+    if (name==='board') loadLeaderboard();
+    if (name==='admin') { loadTeamAdmin(); loadStageAdmin(); }
+  }
+
+  setInterval(()=>{
+    if (activeView==='score') loadScoreView();
+    if (activeView==='board') loadLeaderboard();
+  }, 5000);
+
+  function toast(msg, err) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.color = err ? 'var(--red)' : 'var(--green)';
+    t.style.borderColor = err ? 'var(--red)' : 'var(--green)';
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2400);
+  }
+
+  /* SCORE */
+  async function loadScoreView() {
+    const [tr,sr] = await Promise.all([fetch('/api/teams'),fetch('/api/stages')]);
+    teams = await tr.json();
+    stages = await sr.json();
+    renderPills();
+    if (selectedStop) selectStage(selectedStop);
+  }
+
+  function renderPills() {
+    const el = document.getElementById('stageBtns');
+    if (!stages.length) { el.innerHTML='<div class="empty"><div class="ei">📍</div>Sem etapas. Cria uma no Admin.</div>'; return; }
+    el.innerHTML = stages.map(s=>`
+      <div class="spill ${selectedStop===s.stop_number?'sel':''}" onclick="selectStage(${s.stop_number})">
+        <div class="sn">${s.stop_number}</div>
+        <div class="sl">${s.name||'Paragem '+s.stop_number}</div>
+      </div>`).join('');
+  }
+
+  function selectStage(n) {
+    selectedStop = n;
+    renderPills();
+    const s = stages.find(x=>x.stop_number===n);
+    const c = document.getElementById('clueCard');
+    if (s && s.clue) {
+      document.getElementById('clueText').textContent = s.clue;
+      document.getElementById('clueLocation').textContent = '📍 '+(s.location||'—');
+      document.getElementById('clueMax').textContent = '⭐ Máx. '+s.max_points+' pts';
+      c.classList.add('show');
+    } else { c.classList.remove('show'); }
+    renderScoring(n);
+  }
+
+  function renderScoring(n) {
+    const list = document.getElementById('teamsList');
+    document.getElementById('scoreTitle').style.display = 'block';
+    if (!teams.length) { list.innerHTML='<div class="empty"><div class="ei">👥</div>Sem equipas.</div>'; return; }
+    const k = 'stop'+n;
+    list.innerHTML = teams.map(t=>`
+      <div class="tcard">
+        <div class="tcard-top">
+          <div class="tstripe" style="background:${t.color}"></div>
+          <div class="tinfo">
+            <div class="tn">${t.name}</div>
+            <div class="tt" id="tot-${t.id}">${t.total_points} pts total</div>
+          </div>
+          <div class="tbadge" id="badge-${t.id}">${t[k]||0}</div>
+        </div>
+        <div class="sctrl">
+          <button class="sbtn minus" onclick="adj(${t.id},${n},-5)">−</button>
+          <div class="snwrap"><input class="snum" type="number" id="sc-${t.id}" value="${t[k]||0}" min="0" onchange="syncB(${t.id})"></div>
+          <button class="sbtn plus"  onclick="adj(${t.id},${n},5)">+</button>
+          <button class="sbtn save" id="sv-${t.id}" onclick="save(${t.id},${n})">✓</button>
+        </div>
+      </div>`).join('');
+  }
+
+  function syncB(id) {
+    document.getElementById('badge-'+id).textContent = document.getElementById('sc-'+id).value;
+    document.getElementById('sv-'+id).classList.remove('ok');
+  }
+
+  function adj(id, n, d) {
+    const i = document.getElementById('sc-'+id);
+    i.value = Math.max(0, parseInt(i.value||0)+d);
+    syncB(id);
+  }
+
+  async function save(id, n) {
+    const pts = parseInt(document.getElementById('sc-'+id).value)||0;
+    const res = await fetch('/api/teams/score',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({team_id:id,stop_number:n,points:pts})});
+    if (res.ok) {
+      document.getElementById('sv-'+id).classList.add('ok');
+      const tr2 = await fetch('/api/teams'); teams = await tr2.json();
+      const t = teams.find(x=>x.id===id);
+      if (t) document.getElementById('tot-'+id).textContent = t.total_points+' pts total';
+      toast('✓ Guardado!');
+    } else toast('Erro ao guardar',true);
+  }
+
+  /* LEADERBOARD */
+  async function loadLeaderboard() {
+    const ranked = await (await fetch('/api/leaderboard')).json();
+    const slots = [{t:ranked[1],r:2,c:'p2',m:'🥈'},{t:ranked[0],r:1,c:'p1',m:'🥇'},{t:ranked[2],r:3,c:'p3',m:'🥉'}];
+    document.getElementById('podium').innerHTML = slots.map(({t,r,c,m})=>t?`
+      <div class="pcard ${c}">
+        <div class="pmedal">${m}</div>
+        <div class="prank">${r}º</div>
+        <div class="pdot" style="background:${t.color}"></div>
+        <div class="pname">${t.name}</div>
+        <div class="ppts">${t.total_points}</div>
+      </div>`:'<div></div>').join('');
+    const body = document.getElementById('rankBody');
+    if (!ranked.length) { body.innerHTML='<div class="empty"><div class="ei">🏁</div>Sem equipas.</div>'; return; }
+    body.innerHTML = ranked.map((t,i)=>`
+      <div class="ritem">
+        <div class="rpos ${i<3?'top':''}">${i+1}</div>
+        <div class="rclr" style="background:${t.color}"></div>
+        <div class="rinfo">
+          <div class="rn">${t.name}</div>
+          <div class="rstops">${[1,2,3,4,5,6].map(n=>`<span class="rstop ${t['stop'+n]?'has':''}">P${n}: ${t['stop'+n]||'—'}</span>`).join('')}</div>
+        </div>
+        <div class="rtotal">${t.total_points}</div>
+      </div>`).join('');
+  }
+
+  /* ADMIN TEAMS */
+  async function loadTeamAdmin() {
+    teams = await (await fetch('/api/teams')).json();
+    const el = document.getElementById('teamAdminList');
+    if (!teams.length) { el.innerHTML='<div class="empty"><div class="ei">👥</div>Sem equipas.</div>'; return; }
+    el.innerHTML = teams.map(t=>`
+      <div class="aitem">
+        <div class="arow">
+          <div class="tstripe" style="background:${t.color};height:34px"></div>
+          <div class="ainfo"><strong>${t.name}</strong><span>${t.total_points} pts</span></div>
+          <div class="abtns"><button class="bsm del" onclick="deleteTeam(${t.id})">Remover</button></div>
+        </div>
+      </div>`).join('');
+  }
+
+  async function createTeam() {
+    const name = document.getElementById('newTeamName').value.trim();
+    const color = document.getElementById('newTeamColor').value;
+    if (!name) { toast('Insere um nome',true); return; }
+    await fetch('/api/teams',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,color})});
+    document.getElementById('newTeamName').value='';
+    toast('Equipa criada!'); loadTeamAdmin();
+  }
+
+  async function deleteTeam(id) {
+    if (!confirm('Apagar esta equipa?')) return;
+    await fetch('/api/teams/'+id,{method:'DELETE'});
+    toast('Equipa removida'); loadTeamAdmin();
+  }
+
+  /* ADMIN STAGES */
+  async function loadStageAdmin() {
+    stages = await (await fetch('/api/stages')).json();
+    const el = document.getElementById('stageAdminList');
+    if (!stages.length) { el.innerHTML='<div class="empty"><div class="ei">📍</div>Sem etapas.</div>'; return; }
+    el.innerHTML = stages.map(s=>`
+      <div class="aitem" id="si-${s.id}">
+        <div class="arow">
+          <div class="ainfo">
+            <strong>P${s.stop_number} — ${s.name}</strong>
+            <span>${s.location||'—'} · máx ${s.max_points} pts</span>
+          </div>
+          <div class="abtns">
+            <button class="bsm edit" onclick="toggleEdit(${s.id})">Editar</button>
+            <button class="bsm del"  onclick="deleteStage(${s.id})">✕</button>
+          </div>
+        </div>
+        <div class="eform" id="ef-${s.id}">
+          <div class="row2">
+            <div><span class="flabel">Paragem Nº</span>
+              <select class="finput" id="es-stop-${s.id}">
+                ${[1,2,3,4,5,6].map(n=>`<option value="${n}"${n===s.stop_number?' selected':''}>${n}</option>`).join('')}
+              </select>
+            </div>
+            <div><span class="flabel">Máx. Pts</span><input class="finput" type="number" id="es-max-${s.id}" value="${s.max_points}"></div>
+          </div>
+          <div><span class="flabel">Nome</span><input class="finput" type="text" id="es-name-${s.id}" value="${s.name}"></div>
+          <div><span class="flabel">Local</span><input class="finput" type="text" id="es-loc-${s.id}" value="${s.location||''}"></div>
+          <div><span class="flabel">Pista</span><textarea class="finput" id="es-clue-${s.id}">${s.clue||''}</textarea></div>
+          <div class="row2">
+            <button class="bgold" onclick="saveStage(${s.id})">💾 Guardar</button>
+            <button class="bghost" onclick="toggleEdit(${s.id})">Cancelar</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  function toggleEdit(id) { document.getElementById('ef-'+id).classList.toggle('open'); }
+
+  async function saveStage(id) {
+    const p = {
+      name: document.getElementById('es-name-'+id).value.trim(),
+      location: document.getElementById('es-loc-'+id).value.trim(),
+      clue: document.getElementById('es-clue-'+id).value.trim(),
+      max_points: parseInt(document.getElementById('es-max-'+id).value)||100,
+      stop_number: parseInt(document.getElementById('es-stop-'+id).value)
+    };
+    if (!p.name) { toast('Nome vazio',true); return; }
+    const res = await fetch('/api/stages/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    if (res.ok) { toast('Etapa atualizada!'); loadStageAdmin(); } else toast('Erro',true);
+  }
+
+  async function createStage() {
+    const p = {
+      name: document.getElementById('newStageName').value.trim(),
+      location: document.getElementById('newStageLocation').value.trim(),
+      clue: document.getElementById('newStageClue').value.trim(),
+      max_points: parseInt(document.getElementById('newStageMax').value)||100,
+      stop_number: parseInt(document.getElementById('newStageStop').value)
+    };
+    if (!p.name) { toast('Insere o nome',true); return; }
+    const res = await fetch('/api/stages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+    if (!res.ok) { toast('Erro: '+await res.text(),true); return; }
+    ['newStageName','newStageLocation','newStageClue'].forEach(id=>document.getElementById(id).value='');
+    toast('Etapa guardada!'); loadStageAdmin();
+  }
+
+  async function deleteStage(id) {
+    if (!confirm('Apagar esta etapa?')) return;
+    await fetch('/api/stages/'+id,{method:'DELETE'});
+    toast('Etapa removida'); loadStageAdmin();
+  }
+
+  loadScoreView();
+</script>
+</body>
+</html>
