@@ -41,7 +41,7 @@ func main() {
 
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
-		log.Println("WARNING: DATABASE_URL not set, using empty connection string")
+		log.Println("WARNING: DATABASE_URL not set")
 	}
 
 	db, err = sql.Open("postgres", connStr)
@@ -60,19 +60,19 @@ func main() {
 	}
 	mux.Handle("/", http.FileServer(http.Dir(staticDir)))
 
-	// Teams API
+	// Teams
 	mux.HandleFunc("/api/teams", handleTeams)
+	mux.HandleFunc("/api/teams/score", handleUpdateScore) // must be before /api/teams/
 	mux.HandleFunc("/api/teams/", handleTeamByID)
-	mux.HandleFunc("/api/teams/score", handleUpdateScore)
 
-	// Stages API
+	// Stages
 	mux.HandleFunc("/api/stages", handleStages)
 	mux.HandleFunc("/api/stages/", handleStageByID)
 
 	// Leaderboard
 	mux.HandleFunc("/api/leaderboard", handleLeaderboard)
 
-	log.Println("Rally Paper server running on :8080")
+	log.Println("Rally Paper running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
 
@@ -95,7 +95,7 @@ func createTables() {
 			name TEXT NOT NULL,
 			location TEXT,
 			clue TEXT,
-			max_points INTEGER DEFAULT 100,
+			max_points INTEGER DEFAULT 26,
 			stop_number INTEGER UNIQUE NOT NULL
 		);`,
 	}
@@ -156,15 +156,7 @@ func handleTeams(w http.ResponseWriter, r *http.Request) {
 
 func handleTeamByID(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	// Check if this is the /score sub-path
-	path := r.URL.Path
-	if strings.HasSuffix(path, "/score") {
-		handleUpdateScore(w, r)
-		return
-	}
-
-	idStr := strings.TrimPrefix(path, "/api/teams/")
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/teams/")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid ID", 400)
@@ -204,11 +196,12 @@ func handleUpdateScore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	col := "stop" + strconv.Itoa(payload.StopNum)
 	if payload.StopNum < 1 || payload.StopNum > 6 {
-		http.Error(w, "stop_number must be 1–6", 400)
+		http.Error(w, "stop_number must be 1-6", 400)
 		return
 	}
+
+	col := "stop" + strconv.Itoa(payload.StopNum)
 
 	_, err := db.Exec(
 		`UPDATE teams SET `+col+` = $1,
@@ -216,13 +209,15 @@ func handleUpdateScore(w http.ResponseWriter, r *http.Request) {
 		WHERE id = $2`,
 		payload.Points, payload.TeamID,
 	)
-	// Recalculate after update
-	db.Exec(`UPDATE teams SET total_points = stop1+stop2+stop3+stop4+stop5+stop6 WHERE id = $1`, payload.TeamID)
-
 	if err != nil {
+		log.Println("Score update error:", err)
 		http.Error(w, err.Error(), 500)
 		return
 	}
+
+	// Recalculate total (the inline expression doesn't include the new value yet)
+	db.Exec(`UPDATE teams SET total_points = stop1+stop2+stop3+stop4+stop5+stop6 WHERE id = $1`, payload.TeamID)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
@@ -255,6 +250,9 @@ func handleStages(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
+		}
+		if s.MaxPts == 0 {
+			s.MaxPts = 26
 		}
 		err := db.QueryRow(
 			`INSERT INTO stages (name, location, clue, max_points, stop_number) VALUES ($1,$2,$3,$4,$5) RETURNING id`,

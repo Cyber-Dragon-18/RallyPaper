@@ -206,6 +206,74 @@
     /* EMPTY */
     .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 14px; font-weight: 500; }
     .ei { font-size: 36px; margin-bottom: 10px; }
+
+    /* POSTAL DO PORTO BREAKDOWN */
+    .postal-breakdown {
+      border-top: 1px solid var(--bdr);
+      padding: 14px 14px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .postal-row {}
+
+    .postal-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 7px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+    .postal-max { color: var(--bdr); font-weight: 600; }
+
+    .postal-btns {
+      display: flex;
+      gap: 6px;
+    }
+
+    .pval-btn {
+      flex: 1;
+      height: 44px;
+      border: 2px solid var(--bdr);
+      border-radius: 10px;
+      background: var(--surf2);
+      color: var(--muted);
+      font-size: 16px;
+      font-weight: 800;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .pval-btn:active { transform: scale(.94); }
+    .pval-btn.active {
+      background: var(--gold);
+      border-color: var(--gold);
+      color: #000;
+    }
+
+    .postal-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0 4px;
+      border-top: 1px solid var(--bdr);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .8px;
+    }
+    .postal-total-val {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 26px;
+      color: var(--gold);
+      line-height: 1;
+    }
   </style>
 </head>
 <body>
@@ -307,8 +375,17 @@
     if (name==='admin') { loadTeamAdmin(); loadStageAdmin(); }
   }
 
+  // Track last user interaction to avoid refreshing mid-input
+  let lastInteraction = 0;
+  document.addEventListener('touchstart', ()=>{ lastInteraction = Date.now(); });
+  document.addEventListener('mousedown',  ()=>{ lastInteraction = Date.now(); });
+
   setInterval(()=>{
-    if (activeView==='score') loadScoreView();
+    const idle = Date.now() - lastInteraction > 3000; // 3s since last touch
+    if (activeView==='score') {
+      if (idle) loadScoreView();
+      else refreshScoresSilently(); // just update data, don't re-render
+    }
     if (activeView==='board') loadLeaderboard();
   }, 5000);
 
@@ -328,6 +405,18 @@
     stages = await sr.json();
     renderPills();
     if (selectedStop) selectStage(selectedStop);
+  }
+
+  // Refresh data silently without re-rendering — safe while user is tapping
+  async function refreshScoresSilently() {
+    const [tr,sr] = await Promise.all([fetch('/api/teams'),fetch('/api/stages')]);
+    teams = await tr.json();
+    stages = await sr.json();
+    // Only update the total points labels, don't touch inputs or re-render
+    teams.forEach(t => {
+      const el = document.getElementById('tot-'+t.id);
+      if (el) el.textContent = t.total_points+' pts total';
+    });
   }
 
   function renderPills() {
@@ -354,12 +443,83 @@
     renderScoring(n);
   }
 
+  // Postal do Porto criteria
+  const POSTAL_CRITERIA = [
+    { key:'semelhanca', label:'Semelhança', max:6 },
+    { key:'criatividade', label:'Criatividade', max:6 },
+    { key:'participacao', label:'Toda a equipa participou', max:6 },
+    { key:'velocidade', label:'Velocidade', max:6 },
+    { key:'bonus', label:'Bónus humor', max:2 },
+  ];
+  // Store postal scores per team: { teamId: { semelhanca:0, ... } }
+  const postalScores = {};
+
+  function getPostalTotal(id) {
+    const s = postalScores[id] || {};
+    return POSTAL_CRITERIA.reduce((sum, c) => sum + (parseInt(s[c.key])||0), 0);
+  }
+
+  function postalCriterionChanged(teamId, stopNum) {
+    const total = getPostalTotal(teamId);
+    const badge = document.getElementById('badge-'+teamId);
+    const sc    = document.getElementById('sc-'+teamId);
+    const sv    = document.getElementById('sv-'+teamId);
+    if (badge) badge.textContent = total;
+    if (sc)    sc.value = total;
+    if (sv)    sv.classList.remove('ok');
+    // update the mini-total inside the breakdown
+    const tot = document.getElementById('postal-total-'+teamId);
+    if (tot) tot.textContent = total + ' / 26';
+  }
+
   function renderScoring(n) {
     const list = document.getElementById('teamsList');
     document.getElementById('scoreTitle').style.display = 'block';
     if (!teams.length) { list.innerHTML='<div class="empty"><div class="ei">👥</div>Sem equipas.</div>'; return; }
     const k = 'stop'+n;
-    list.innerHTML = teams.map(t=>`
+    const stage = stages.find(x=>x.stop_number===n);
+    const isPostal = stage && stage.name.toLowerCase().includes('postal');
+
+    list.innerHTML = teams.map(t => {
+      // init postal scores from existing value if not set
+      if (isPostal && !postalScores[t.id]) {
+        postalScores[t.id] = {};
+      }
+
+      const scoreControls = isPostal ? `
+        <div class="postal-breakdown" id="pb-${t.id}">
+          ${POSTAL_CRITERIA.map(c => `
+            <div class="postal-row">
+              <div class="postal-label">
+                <span>${c.label}</span>
+                <span class="postal-max">/ ${c.max}</span>
+              </div>
+              <div class="postal-btns">
+                ${Array.from({length: c.max+1}, (_,i) => `
+                  <button class="pval-btn ${(postalScores[t.id][c.key]||0)===i?'active':''}"
+                    onclick="setPostal(${t.id},4,'${c.key}',${i},${c.max})">${i}</button>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
+          <div class="postal-total-row">
+            <span>Total</span>
+            <span class="postal-total-val" id="postal-total-${t.id}">${getPostalTotal(t.id)} / 26</span>
+          </div>
+          <button class="sbtn save" id="sv-${t.id}" style="width:100%;height:52px;font-size:16px;border-radius:0 0 14px 14px"
+            onclick="save(${t.id},${n})">✓ Guardar</button>
+        </div>
+        <input type="hidden" id="sc-${t.id}" value="${getPostalTotal(t.id)}">
+      ` : `
+        <div class="sctrl">
+          <button class="sbtn minus" onclick="adj(${t.id},${n},-1)">−</button>
+          <div class="snwrap"><input class="snum" type="number" id="sc-${t.id}" value="${t[k]||0}" min="0" onchange="syncB(${t.id})"></div>
+          <button class="sbtn plus"  onclick="adj(${t.id},${n},1)">+</button>
+          <button class="sbtn save" id="sv-${t.id}" onclick="save(${t.id},${n})">✓</button>
+        </div>
+      `;
+
+      return `
       <div class="tcard">
         <div class="tcard-top">
           <div class="tstripe" style="background:${t.color}"></div>
@@ -367,15 +527,27 @@
             <div class="tn">${t.name}</div>
             <div class="tt" id="tot-${t.id}">${t.total_points} pts total</div>
           </div>
-          <div class="tbadge" id="badge-${t.id}">${t[k]||0}</div>
+          <div class="tbadge" id="badge-${t.id}">${isPostal ? getPostalTotal(t.id) : (t[k]||0)}</div>
         </div>
-        <div class="sctrl">
-          <button class="sbtn minus" onclick="adj(${t.id},${n},-5)">−</button>
-          <div class="snwrap"><input class="snum" type="number" id="sc-${t.id}" value="${t[k]||0}" min="0" onchange="syncB(${t.id})"></div>
-          <button class="sbtn plus"  onclick="adj(${t.id},${n},5)">+</button>
-          <button class="sbtn save" id="sv-${t.id}" onclick="save(${t.id},${n})">✓</button>
-        </div>
-      </div>`).join('');
+        ${scoreControls}
+      </div>`;
+    }).join('');
+  }
+
+  function setPostal(teamId, stopNum, key, val, max) {
+    if (!postalScores[teamId]) postalScores[teamId] = {};
+    postalScores[teamId][key] = val;
+    // Re-highlight buttons for this criterion
+    const pb = document.getElementById('pb-'+teamId);
+    if (!pb) return;
+    const rows = pb.querySelectorAll('.postal-row');
+    const rowIdx = POSTAL_CRITERIA.findIndex(c=>c.key===key);
+    if (rowIdx >= 0) {
+      rows[rowIdx].querySelectorAll('.pval-btn').forEach((b,i) => {
+        b.classList.toggle('active', i === val);
+      });
+    }
+    postalCriterionChanged(teamId, stopNum);
   }
 
   function syncB(id) {
@@ -391,6 +563,9 @@
 
   async function save(id, n) {
     const pts = parseInt(document.getElementById('sc-'+id).value)||0;
+    const stage = stages.find(s=>s.stop_number===n);
+    const max = stage ? stage.max_points : 26;
+    if (pts > max) { toast('Máximo: '+max+' pts!', true); return; }
     const res = await fetch('/api/teams/score',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({team_id:id,stop_number:n,points:pts})});
     if (res.ok) {
       document.getElementById('sv-'+id).classList.add('ok');
